@@ -247,3 +247,44 @@ _Pvt_Extensions
 *.sln.iml
 /replay.server.battlelobby
 /packages
+
+# --- Additions for HotsStats revival ---
+
+# Modern Visual Studio / MSBuild artifacts not in the legacy template
+*.rsuser
+mono_crash.*
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+[Oo]utput/
+Generated Files/
+BenchmarkDotNet.Artifacts/
+*.iobj
+*.ipdb
+*_wpftmp.csproj
+*.binlog
+*.snupkg
+.localhistory/
+MigrationBackup/
+**/Properties/launchSettings.json
+
+# NuGet symbol packages / restore leftovers
+project.fragment.lock.json
+
+# Project-specific runtime artifacts
+# Debug builds capture game files into a local 'saves/' folder (App.xaml.cs)
+saves/
+# NLog rolling archives (log.txt itself is covered by *.log)
+log.*.txt
+
+# Secrets / environment
+.env
+
+# Claude Code and AI tooling local configs
+CLAUDE.local.md
+settings.local.json
+.claude/settings.local.json
+.claude/plans/
+.claude/logs/
+.claude/worktrees/
+.mcp.json
+.planning/
