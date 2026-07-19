@@ -7,11 +7,13 @@
     <UseWindowsForms>true</UseWindowsForms>
     <AssemblyName>HotsStats</AssemblyName>
     <RootNamespace>StatsDisplay</RootNamespace>
-    <Version>0.6.6</Version>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>disable</Nullable>
     <ApplicationIcon>icon.ico</ApplicationIcon>
+    <!-- NotifyIcon / Icon.ExtractAssociatedIcon are flagged as Windows-only APIs by CA1416, but
+         this app is net10.0-windows (Windows-only by design), so the warning is expected noise. -->
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

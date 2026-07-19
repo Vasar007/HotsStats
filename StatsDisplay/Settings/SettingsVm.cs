@@ -101,8 +101,12 @@ namespace StatsDisplay.Settings
 
         private void SetupTrayIcon()
         {
+            // Environment.ProcessPath is the robust choice on modern .NET: Assembly.Location can
+            // be an empty string under single-file publish, which throws inside
+            // Icon.ExtractAssociatedIcon. For a normal build both paths point at the same exe.
+            var iconSourcePath = Environment.ProcessPath ?? _currentAssembly.Location;
             _trayIcon = new NotifyIcon {
-                Icon = Icon.ExtractAssociatedIcon(_currentAssembly.Location),
+                Icon = Icon.ExtractAssociatedIcon(iconSourcePath),
                 Visible = false
             };
             _trayIcon.Click += (o, e) => {
