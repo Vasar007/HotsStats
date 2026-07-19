@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
 using GalaSoft.MvvmLight;
@@ -17,6 +18,7 @@ namespace StatsDisplay.Stats
         private int? _teamTwoAverageMmr;
         private TeamVm _teamOne;
         private TeamVm _teamTwo;
+        private PropertyChangedEventHandler _settingsPropertyChangedHandler;
 
         public int? TeamTwoAverageMmr
         {
@@ -100,16 +102,33 @@ namespace StatsDisplay.Stats
                 TeamOneAverageMmr = TeamOne.AverageMmr(Settings.MmrDisplayMode);
                 TeamTwoAverageMmr = TeamTwo.AverageMmr(Settings.MmrDisplayMode);
             };
-            Settings.PropertyChanged += (o, e) => {
+            // Settings.Default is an application-lifetime static, so this subscription must be
+            // removed explicitly (see OnDeactivated) or every game would leak this view model
+            // (and the window holding it) for the lifetime of the app.
+            _settingsPropertyChangedHandler = (o, e) => {
                 if (e.PropertyName == nameof(Settings.MmrDisplayMode)) {
                     TeamOneAverageMmr = TeamOne.AverageMmr(Settings.MmrDisplayMode);
                     TeamTwoAverageMmr = TeamTwo.AverageMmr(Settings.MmrDisplayMode);
                 }
             };
+            Settings.PropertyChanged += _settingsPropertyChangedHandler;
 
             if (Settings.AutoClose) {
                 await Task.Delay(10000);
                 Messenger.Default.Send(new HideShortStats());
+            }
+        }
+
+        /// <summary>
+        /// Detaches from the static Settings.PropertyChanged event. Must be called when the
+        /// owning window is closed, otherwise this view model (and the window) is kept alive
+        /// for the rest of the application's lifetime.
+        /// </summary>
+        public void OnDeactivated()
+        {
+            if (_settingsPropertyChangedHandler != null) {
+                Settings.PropertyChanged -= _settingsPropertyChangedHandler;
+                _settingsPropertyChangedHandler = null;
             }
         }
     }

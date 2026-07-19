@@ -29,6 +29,7 @@ namespace StatsDisplay.Stats
             }
             Messenger.Default.Register(this, (HideShortStats _) => Hide());
             Loaded += (_, __) => _viewModel.OnActivated();
+            Closed += (_, __) => _viewModel.OnDeactivated();
         }
     }
 }

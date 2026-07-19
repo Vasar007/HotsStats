@@ -42,12 +42,18 @@ namespace StatsDisplay.Helpers
             Id = virtualKeyCode + ((int)KeyModifiers * 0x10000);
             bool result = RegisterHotKey(IntPtr.Zero, Id, (UInt32)KeyModifiers, (UInt32)virtualKeyCode);
 
+            if (!result) {
+                Debug.WriteLine($"HotKey.Register: RegisterHotKey failed for key {Key} with modifiers {KeyModifiers} (id {Id}).");
+            }
+
             if (_dictHotKeyToCalBackProc == null) {
                 _dictHotKeyToCalBackProc = new Dictionary<int, HotKey>();
                 ComponentDispatcher.ThreadFilterMessage += new ThreadMessageEventHandler(ComponentDispatcherThreadFilterMessage);
             }
 
-            _dictHotKeyToCalBackProc.Add(Id, this);
+            // Indexer assignment (not .Add) so registering a duplicate id replaces the previous
+            // entry instead of throwing an ArgumentException.
+            _dictHotKeyToCalBackProc[Id] = this;
 
             Debug.Print(result.ToString() + ", " + Id + ", " + virtualKeyCode);
             return result;
