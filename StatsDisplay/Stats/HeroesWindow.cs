@@ -1,4 +1,5 @@
-﻿using System.Windows;
+﻿using System.Diagnostics;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using StatsFetcher;
@@ -41,7 +42,7 @@ namespace StatsDisplay.Stats
         {
             var link = (sender as Image).Tag as string;
             if (link != null)
-                System.Diagnostics.Process.Start(link);
+                Process.Start(new ProcessStartInfo(link) { UseShellExecute = true });
         }
     }
 }

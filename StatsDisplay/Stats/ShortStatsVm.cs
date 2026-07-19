@@ -2,15 +2,15 @@
 using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
-using GalaSoft.MvvmLight;
-using GalaSoft.MvvmLight.Messaging;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Messaging;
 using Heroes.ReplayParser;
 using StatsDisplay.Stats.Messages;
 using StatsFetcher;
 
 namespace StatsDisplay.Stats
 {
-    public class ShortStatsVm : ViewModelBase
+    public class ShortStatsVm : ObservableObject
     {
         public Game Game => App.Game;
         public Properties.Settings Settings => App.Settings;
@@ -29,7 +29,7 @@ namespace StatsDisplay.Stats
             {
                 if (_teamTwoAverageMmr != value) {
                     _teamTwoAverageMmr = value;
-                    RaisePropertyChanged();
+                    OnPropertyChanged();
                 }
             }
         }
@@ -41,7 +41,7 @@ namespace StatsDisplay.Stats
             {
                 if (_teamOneAverageMmr != value) {
                     _teamOneAverageMmr = value;
-                    RaisePropertyChanged();
+                    OnPropertyChanged();
                 }
             }
         }
@@ -53,7 +53,7 @@ namespace StatsDisplay.Stats
             {
                 if (_teamOne != value) {
                     _teamOne = value;
-                    RaisePropertyChanged();
+                    OnPropertyChanged();
                 }
             }
         }
@@ -65,7 +65,7 @@ namespace StatsDisplay.Stats
             {
                 if (_teamTwo != value) {
                     _teamTwo = value;
-                    RaisePropertyChanged();
+                    OnPropertyChanged();
                 }
             }
         }
@@ -124,7 +124,7 @@ namespace StatsDisplay.Stats
 
             if (Settings.AutoClose) {
                 await Task.Delay(10000);
-                Messenger.Default.Send(new HideShortStats());
+                WeakReferenceMessenger.Default.Send(new HideShortStats());
             }
         }
 
@@ -148,7 +148,7 @@ namespace StatsDisplay.Stats
         }
     }
 
-    public class TeamVm : ViewModelBase
+    public class TeamVm : ObservableObject
     {
         private TeamTypes _teamType;
 
@@ -162,7 +162,7 @@ namespace StatsDisplay.Stats
             set
             {
                 _teamType = value;
-                RaisePropertyChanged();
+                OnPropertyChanged();
             }
         }
 

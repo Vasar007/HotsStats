@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Windows;
-using GalaSoft.MvvmLight.Messaging;
+using CommunityToolkit.Mvvm.Messaging;
 using StatsDisplay.Settings.Messages;
 
 namespace StatsDisplay.Settings
@@ -12,15 +12,15 @@ namespace StatsDisplay.Settings
     {
         public Properties.Settings Settings => App.Settings;
         private readonly SettingsVm _viewModel;
-        
+
         public SettingsWindow()
         {
             _viewModel = new SettingsVm();
             DataContext = _viewModel;
 
-            Messenger.Default.Register(this, (ShowSettingsWindow _) => Show());
-            Messenger.Default.Register(this, (HideSettingsWindow _) => Hide());
-            
+            WeakReferenceMessenger.Default.Register<ShowSettingsWindow>(this, (r, m) => Show());
+            WeakReferenceMessenger.Default.Register<HideSettingsWindow>(this, (r, m) => Hide());
+
             Loaded += (_, __) => _viewModel.OnActivated();
 
             if (App.Settings.SettingsWindowTop <= 0) {

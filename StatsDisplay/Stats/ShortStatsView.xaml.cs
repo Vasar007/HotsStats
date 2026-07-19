@@ -3,7 +3,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
-using GalaSoft.MvvmLight.Messaging;
+using CommunityToolkit.Mvvm.Messaging;
 using StatsDisplay.Stats.Messages;
 
 namespace StatsDisplay.Stats
@@ -27,7 +27,7 @@ namespace StatsDisplay.Stats
             {
                 WindowStartupLocation = WindowStartupLocation.CenterScreen;
             }
-            Messenger.Default.Register(this, (HideShortStats _) => Hide());
+            WeakReferenceMessenger.Default.Register<HideShortStats>(this, (r, m) => Hide());
             Loaded += (_, __) => _viewModel.OnActivated();
             Closed += (_, __) => _viewModel.OnDeactivated();
         }

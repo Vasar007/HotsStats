@@ -6,9 +6,9 @@ using System.Reflection;
 using System.Windows;
 using System.Windows.Forms;
 using System.Windows.Input;
-using GalaSoft.MvvmLight;
-using GalaSoft.MvvmLight.CommandWpf;
-using GalaSoft.MvvmLight.Messaging;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Messaging;
 using Heroes.ReplayParser;
 using NLog;
 using StatsDisplay.Settings.Messages;
@@ -19,7 +19,7 @@ namespace StatsDisplay.Settings
     /// <summary>
     /// Viewmodel for the settings window
     /// </summary>
-    public class SettingsVm : ViewModelBase
+    public class SettingsVm : ObservableObject
     {
         public Properties.Settings Settings => App.Settings;
         private static Logger _logger = LogManager.GetCurrentClassLogger();
@@ -44,7 +44,7 @@ namespace StatsDisplay.Settings
             {
                 if (_windowState != value) {
                     _windowState = value;
-                    RaisePropertyChanged();
+                    OnPropertyChanged();
                 }
             }
         }
@@ -76,7 +76,7 @@ namespace StatsDisplay.Settings
 
         private void OnNavigate(string uri)
         {
-            Process.Start(new ProcessStartInfo(uri));
+            Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true });
         }
 
         private void OnTest1()
@@ -125,9 +125,9 @@ namespace StatsDisplay.Settings
         /// </summary>
         /// <typeparam name="T">the message type</typeparam>
         private void SendMessage<T>()
-            where T : new()
+            where T : class, new()
         {
-            Messenger.Default.Send<T>(new T());
+            WeakReferenceMessenger.Default.Send<T>(new T());
         }
     }
 }
