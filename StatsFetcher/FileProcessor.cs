@@ -34,7 +34,7 @@ namespace StatsFetcher
 				// For now we will just wait 1 sec and hope it is enough
 				await Task.Delay(1000);
 				await SafeCopy(path, tmpPath, true);
-				var replayData = DataParser.ParseReplay(tmpPath, true, true, skipUnitParsing: true, skipMouseMoveEvents: true);
+				var replayData = await Task.Run(() => DataParser.ParseReplay(tmpPath, true, true, skipUnitParsing: true, skipMouseMoveEvents: true));
 				var replay = replayData.Item2;
 
 				if (replayData.Item2 == null) {
@@ -69,7 +69,7 @@ namespace StatsFetcher
 			try {
 				await SafeCopy(path, tmpPath, true);
 
-				var replay = ParseRejoin(tmpPath);
+				var replay = await Task.Run(() => ParseRejoin(tmpPath));
 				foreach (var profile in game.Players){
 					var player = replay.Players.FirstOrDefault(p => p.Name == profile.Name);
 					if (player == null)

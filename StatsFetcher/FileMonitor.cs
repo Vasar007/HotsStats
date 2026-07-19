@@ -3,11 +3,14 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using NLog;
 
 namespace StatsFetcher
 {
     public class FileMonitor
     {
+        private static readonly Logger _logger = LogManager.GetCurrentClassLogger();
+
         public readonly string BattleLobbyPath = Path.Combine(Path.GetTempPath(), @"Heroes of the Storm\TempWriteReplayP1\replay.server.battlelobby");
         public readonly string ProfilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), @"Heroes of the Storm\Accounts");
         private FileSystemWatcher rejoinWatcher;
@@ -60,23 +63,38 @@ namespace StatsFetcher
                 }
             },TaskCreationOptions.LongRunning);
 
-            rejoinWatcher = new FileSystemWatcher();
-            rejoinWatcher.Path = ProfilePath;
-            rejoinWatcher.Filter = "*.StormSave";
-            rejoinWatcher.IncludeSubdirectories = true;
-            rejoinWatcher.Created += (o, e) => {
-                OnRejoinFileCreated(e.FullPath);
-            };
-            rejoinWatcher.EnableRaisingEvents = true;
+            if (!Directory.Exists(ProfilePath)) {
+                _logger.Warn($"Game folder '{ProfilePath}' does not exist (HotS may never have been run); skipping rejoin/replay file monitoring.");
+                return;
+            }
 
-            replayWatcher = new FileSystemWatcher();
-            replayWatcher.Path = ProfilePath;
-            replayWatcher.Filter = "*.StormReplay";
-            replayWatcher.IncludeSubdirectories = true;
-            replayWatcher.Created += (o, e) => {
-                OnReplayFileCreated(e.FullPath);
-            };
-            replayWatcher.EnableRaisingEvents = true;
+            try {
+                rejoinWatcher = new FileSystemWatcher();
+                rejoinWatcher.Path = ProfilePath;
+                rejoinWatcher.Filter = "*.StormSave";
+                rejoinWatcher.IncludeSubdirectories = true;
+                rejoinWatcher.Created += (o, e) => {
+                    OnRejoinFileCreated(e.FullPath);
+                };
+                rejoinWatcher.EnableRaisingEvents = true;
+            }
+            catch (Exception ex) {
+                _logger.Warn(ex, $"Failed to start watching '{ProfilePath}' for *.StormSave files.");
+            }
+
+            try {
+                replayWatcher = new FileSystemWatcher();
+                replayWatcher.Path = ProfilePath;
+                replayWatcher.Filter = "*.StormReplay";
+                replayWatcher.IncludeSubdirectories = true;
+                replayWatcher.Created += (o, e) => {
+                    OnReplayFileCreated(e.FullPath);
+                };
+                replayWatcher.EnableRaisingEvents = true;
+            }
+            catch (Exception ex) {
+                _logger.Warn(ex, $"Failed to start watching '{ProfilePath}' for *.StormReplay files.");
+            }
         }
     }
 }

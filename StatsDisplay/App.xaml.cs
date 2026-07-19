@@ -92,17 +92,22 @@ namespace StatsDisplay
 
 		internal async void ProcessLobbyFile(string path)
 		{
-			if (!Settings.Enabled)
-				return;
+			try {
+				if (!Settings.Enabled)
+					return;
 
-			//TODO: remove global state
-			Game = await FileProcessor.ProcessLobbyFile(path);
-			Game.Me = Game.Players.FirstOrDefault(p => p.BattleTag == Settings.BattleTag || p.Name == Settings.BattleTag);
+				//TODO: remove global state
+				Game = await FileProcessor.ProcessLobbyFile(path);
+				Game.Me = Game.Players.FirstOrDefault(p => p.BattleTag == Settings.BattleTag || p.Name == Settings.BattleTag);
 
-			_currentWindow?.Close();
-			_currentWindow = new ShortStatsWindow();
-			if (Settings.AutoShow)
-				_currentWindow.Show();
+				_currentWindow?.Close();
+				_currentWindow = new ShortStatsWindow();
+				if (Settings.AutoShow)
+					_currentWindow.Show();
+			}
+			catch (Exception ex) {
+				_logger.Error(ex, "Failed to process lobby file");
+			}
 		}
 
 		internal async void ProcessRejoinFile(string path)
@@ -133,15 +138,20 @@ namespace StatsDisplay
 
 		internal async void ProcessReplayFile(string path)
 		{
-			if (Settings.ShowRecap) {
-				if (Game == null) {
-					return;
+			try {
+				if (Settings.ShowRecap) {
+					if (Game == null) {
+						return;
+					}
+					await FileProcessor.ProcessReplayFile(path, Game);
+					_currentWindow?.Close();
+					_currentWindow = new RecapStatsWindow();
+					if (Settings.AutoShow)
+						_currentWindow.Show();
 				}
-				await FileProcessor.ProcessReplayFile(path, Game);
-				_currentWindow?.Close();
-				_currentWindow = new RecapStatsWindow();
-				if (Settings.AutoShow)
-					_currentWindow.Show();
+			}
+			catch (Exception ex) {
+				_logger.Error(ex, "Failed to process replay file");
 			}
 		}
 
