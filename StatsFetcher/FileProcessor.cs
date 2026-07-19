@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using System.IO;
@@ -15,32 +14,42 @@ namespace StatsFetcher
 
 		public static async Task<Game> ProcessLobbyFile(string path)
 		{
-            var tmpPath = Path.GetTempFileName();
-            await SafeCopy(path, tmpPath, true);
-            var game = new BattleLobbyParser(tmpPath).Parse();
-            await FetchProfiles(game);
-			return game;
+			var tmpPath = Path.GetTempFileName();
+			try {
+				await SafeCopy(path, tmpPath, true);
+				var game = new BattleLobbyParser(tmpPath).Parse();
+				await FetchProfiles(game);
+				return game;
+			}
+			finally {
+				try { File.Delete(tmpPath); } catch { }
+			}
 		}
 
 		public static async Task ProcessReplayFile(string path, Game game)
 		{
 			var tmpPath = Path.GetTempFileName();
-			// todo: we need a way to detect when HotS finished writing this file
-			// For now we will just wait 1 sec and hope it is enough
-			await Task.Delay(1000);
-			await SafeCopy(path, tmpPath, true);
-			var replayData = DataParser.ParseReplay(tmpPath, true, true, skipUnitParsing: true, skipMouseMoveEvents: true);
-			var replay = replayData.Item2;
+			try {
+				// todo: we need a way to detect when HotS finished writing this file
+				// For now we will just wait 1 sec and hope it is enough
+				await Task.Delay(1000);
+				await SafeCopy(path, tmpPath, true);
+				var replayData = DataParser.ParseReplay(tmpPath, true, true, skipUnitParsing: true, skipMouseMoveEvents: true);
+				var replay = replayData.Item2;
 
-			if (replayData.Item2 == null) {
-				throw new Exception($"Unable to parse replay: {replayData.Item1}");
+				if (replayData.Item2 == null) {
+					throw new Exception($"Unable to parse replay: {replayData.Item1}");
+				}
+
+				foreach (var profile in game.Players) {
+					var player = replay.Players.FirstOrDefault(p => p.Name == profile.Name);
+					if (player == null)
+						continue;
+					profile.Stats = player.ScoreResult;
+				}
 			}
-
-			foreach (var profile in game.Players) {
-				var player = replay.Players.FirstOrDefault(p => p.Name == profile.Name);
-				if (player == null)
-					continue;
-				profile.Stats = player.ScoreResult;
+			finally {
+				try { File.Delete(tmpPath); } catch { }
 			}
 		}
 
@@ -57,45 +66,49 @@ namespace StatsFetcher
 		public static async Task ProcessRejoinAsync(string path, Game game)
 		{
 			var tmpPath = Path.GetTempFileName();
-			await SafeCopy(path, tmpPath, true);
+			try {
+				await SafeCopy(path, tmpPath, true);
 
-			var replay = ParseRejoin(tmpPath);
-			foreach (var profile in game.Players){
-				var player = replay.Players.FirstOrDefault(p => p.Name == profile.Name);
-				if (player == null)
-					continue;
-				profile.Hero = player.Character;
-				profile.HeroLevel = player.CharacterLevel;
-				//profile.Team = player.Team; // this should fix possible mistakes made by battlelobby analyzer
+				var replay = ParseRejoin(tmpPath);
+				foreach (var profile in game.Players){
+					var player = replay.Players.FirstOrDefault(p => p.Name == profile.Name);
+					if (player == null)
+						continue;
+					profile.Hero = player.Character;
+					profile.HeroLevel = player.CharacterLevel;
+					//profile.Team = player.Team; // this should fix possible mistakes made by battlelobby analyzer
+				}
+				game.Map = replay.Map;
+				game.GameMode = replay.GameMode;
+				ExtractFullData(game);
 			}
-			game.Map = replay.Map;
-			game.GameMode = replay.GameMode;
-			ExtractFullData(game);
+			finally {
+				try { File.Delete(tmpPath); } catch { }
+			}
 		}
 
 
 		private static async Task SafeCopy(string source, string dest, bool overwrite)
 		{
 			var watchdog = 10;
-			var retry = false;
-			do
+			while (true)
 			{
 				try
 				{
 					File.Copy(source, dest, overwrite);
-					retry = false;
+					return;
 				}
 				catch (Exception ex)
 				{
-					Debug.WriteLine($"Failed to copy ${source} to ${dest}. Counter at ${watchdog} CAUSED BY ${ex}");
+					_logger.Warn(ex, $"Failed to copy {source} to {dest}. Retries left: {watchdog}");
 					if (watchdog <= 0)
 					{
 						throw;
 					}
-					retry = true;
 				}
+				watchdog--;
 				await Task.Delay(1000);
-			} while (watchdog-- > 0 && retry);
+			}
 		}
 
 		public static Replay ParseRejoin(string fileName)
