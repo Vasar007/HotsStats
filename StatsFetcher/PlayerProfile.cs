@@ -39,7 +39,7 @@ namespace StatsFetcher
         public int? GamesCount { get; set; }
 
         public string Name { get { return BattleTag.Split('#')[0]; } }
-        public string Link { get { return ProfileId == null ? null : $"http://www.hotslogs.com/Player/Profile?PlayerID={ProfileId}&utm_source=HotsStats&utm_medium=link"; } }
+        public string Link { get { return ProfileId == null ? null : $"https://www.heroesprofile.com/Player/{Uri.EscapeDataString(Name)}/{ProfileId}/{(int)Region}"; } }
 
         // using this properties greatly simplifies style bingings in gui
         public bool IsMe { get { return Game.Me == this; } }

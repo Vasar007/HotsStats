@@ -34,7 +34,7 @@
             <CheckBox IsChecked="{Binding Settings.AutoUpdate}" Content="Update automatically " Margin="0, 8, 0, 0" />
             <TextBlock Text="Press Shift+Tab during game to show stats window. Full statistics is available after 1:00 during match" TextWrapping="Wrap" Margin="0, 8, 0, 0" Foreground="DimGray" />
             <TextBlock TextWrapping="Wrap" Margin="0, 8, 0, 0" Foreground="DimGray" FontSize="10">
-                Data is provided by <Hyperlink NavigateUri="{Binding HostLogUri}" Command="{Binding NavigateToHotsLogs}" >HotsLogs.com</Hyperlink>
+                Data is provided by <Hyperlink NavigateUri="{Binding DataSourceUri}" Command="{Binding NavigateToDataSource}" >Heroes Profile</Hyperlink>
             </TextBlock>
             <StackPanel Orientation="Horizontal" Margin="0, 8, 0, 0" Visibility="{Binding IsTestButtonVisible, Converter={StaticResource booleanToVisibilityConverter}}">
                 <Button Content="Test 1" Command="{Binding Test1}" Padding="8, 0" Margin="0, 0, 8, 0" />

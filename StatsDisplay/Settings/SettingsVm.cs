@@ -28,13 +28,13 @@ namespace StatsDisplay.Settings
         private NotifyIcon _trayIcon;
 
         #region Bindable Properties
-        public ICommand NavigateToHotsLogs { get; set; }
+        public ICommand NavigateToDataSource { get; set; }
         public ICommand Test1 { get; set; }
         public ICommand Test2 { get; set; }
         public ICommand Test3 { get; set; }
 
         public string Title { get; private set; }
-        public string LogHotsUri => "http://www.hotslogs.com/Default?utm_source=HotsStats&amp;utm_medium=link";
+        public string DataSourceUri => "https://www.heroesprofile.com/";
         public bool IsTestButtonVisible => App.Debug;
 
         public WindowState WindowState
@@ -68,7 +68,7 @@ namespace StatsDisplay.Settings
             _currentAssembly = Assembly.GetExecutingAssembly();
             var currentVersion = _currentAssembly.GetName().Version;
             Title = $"HotsStats v{currentVersion.Major}.{currentVersion.Minor}" + (currentVersion.Build == 0 ? "" : $".{currentVersion.Build}");
-            NavigateToHotsLogs = new RelayCommand(() => OnNavigate(LogHotsUri));
+            NavigateToDataSource = new RelayCommand(() => OnNavigate(DataSourceUri));
             Test1 = new RelayCommand(() => OnTest1());
             Test2 = new RelayCommand(() => OnTest2());
             Test3 = new RelayCommand(() => OnTest3());
