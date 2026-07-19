@@ -98,12 +98,17 @@ namespace StatsFetcher
                     // Prefer an exact match on the full battletag (e.g. "Name#1234") when the
                     // candidate exposes one - short name + region alone can collide with an
                     // unrelated player who happens to share both, and the heuristic below would
-                    // then pick whichever of them has played the most games.
+                    // then pick whichever of them has played the most games. The same full tag
+                    // can itself exist in multiple regions, so it must also match the lobby's
+                    // region before it's allowed to win - otherwise a wrong-region candidate could
+                    // still lock out a later, region-correct one via the `fullTagMatch == null`
+                    // guard below.
                     if (fullTagMatch == null) {
                         foreach (var key in FullBattleTagKeys) {
                             var value = (string)candidate[key];
                             if (!string.IsNullOrEmpty(value) && string.Equals(value, p.BattleTag, StringComparison.OrdinalIgnoreCase)) {
-                                fullTagMatch = candidate;
+                                if ((int?)candidate["region"] == (int)game.Region)
+                                    fullTagMatch = candidate;
                                 break;
                             }
                         }
@@ -251,12 +256,22 @@ namespace StatsFetcher
                 var probe = token as JObject;
                 if (probe == null)
                     continue;
-                foreach (var key in WinRateKeys) {
-                    var value = (float?)probe[key];
-                    if (value != null && value.Value > 1f) {
-                        alreadyPercent = true;
-                        break;
+                try {
+                    // Mirror the main loop's precedence below: use the first present key per
+                    // entry rather than scanning every key, so the scale is detected from the
+                    // same value the main loop will actually read.
+                    foreach (var key in WinRateKeys) {
+                        var value = (float?)probe[key];
+                        if (value != null) {
+                            if (value.Value > 1f)
+                                alreadyPercent = true;
+                            break;
+                        }
                     }
+                }
+                catch (Exception ex) {
+                    _logger.Warn(ex, $"Failed to probe a {endpoint} entry for {p.BattleTag} while detecting win-rate scale");
+                    continue;
                 }
                 if (alreadyPercent)
                     break;
@@ -319,8 +334,13 @@ namespace StatsFetcher
                 if (_bootstrapped)
                     return;
 
-                if (DateTime.UtcNow - _lastBootstrapAttempt < BootstrapCooldown)
+                if (DateTime.UtcNow - _lastBootstrapAttempt < BootstrapCooldown) {
+                    // Diagnosable no-op: without this, a 419-forced re-bootstrap that lands inside
+                    // the cooldown window silently resends the stale token and 419s again, with no
+                    // trace of why the retry didn't help.
+                    _logger.Debug($"HeroesProfile session bootstrap skipped (cooldown): last attempt {(DateTime.UtcNow - _lastBootstrapAttempt).TotalSeconds:F1}s ago, cooldown is {BootstrapCooldown.TotalSeconds}s");
                     return;
+                }
                 _lastBootstrapAttempt = DateTime.UtcNow;
 
                 try {

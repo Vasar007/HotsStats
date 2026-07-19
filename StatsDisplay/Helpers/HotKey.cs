@@ -66,6 +66,12 @@ namespace StatsDisplay.Helpers
         
         public void Unregister()
         {
+            // The dictionary is only created in Register(); a HotKey constructed with
+            // register:false and disposed without ever calling Register() must be a no-op here
+            // rather than dereferencing a null dictionary.
+            if (_dictHotKeyToCalBackProc == null)
+                return;
+
             HotKey hotKey;
             if (_dictHotKeyToCalBackProc.TryGetValue(Id, out hotKey)) {
                 UnregisterHotKey(IntPtr.Zero, Id);
