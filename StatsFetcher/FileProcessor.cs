@@ -118,9 +118,8 @@ namespace StatsFetcher
 				}
 			}
 			catch (Exception ex) {
-				//TODO: WE REALLY DON't want to do this
-				Debug.WriteLine(ex);
-				return null;
+				_logger.Warn(ex, $"Failed to parse rejoin file '{fileName}'");
+				throw;
 			}
 		}
 
