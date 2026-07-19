@@ -26,7 +26,7 @@ namespace StatsFetcher
 
         public string BattleTag { get; private set; }
         public Region Region { get; private set; }
-        public int? HotslogsId { get; set; }
+        public long? ProfileId { get; set; }
         public int Team { get; set; }
         public string Hero { get; set; }
 
@@ -38,7 +38,7 @@ namespace StatsFetcher
         public int? GamesCount { get; set; }
 
         public string Name { get { return BattleTag.Split('#')[0]; } }
-        public string Link { get { return HotslogsId == null ? null : $"http://www.hotslogs.com/Player/Profile?PlayerID={HotslogsId}&utm_source=HotsStats&utm_medium=link"; } }
+        public string Link { get { return ProfileId == null ? null : $"http://www.hotslogs.com/Player/Profile?PlayerID={ProfileId}&utm_source=HotsStats&utm_medium=link"; } }
 
         // using this properties greatly simplifies style bingings in gui
         public bool IsMe { get { return Game.Me == this; } }
