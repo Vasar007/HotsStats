@@ -3,7 +3,6 @@ using System.Linq;
 using System.Collections.Generic;
 using Heroes.ReplayParser;
 using System.ComponentModel;
-using HtmlAgilityPack;
 
 namespace StatsFetcher
 {
@@ -22,6 +21,8 @@ namespace StatsFetcher
                 { GameMode.TeamLeague, null },
                 { GameMode.StormLeague, null },
             };
+            HeroWinRates = new Dictionary<string, float>(StringComparer.OrdinalIgnoreCase);
+            MapWinRates = new Dictionary<string, float>(StringComparer.OrdinalIgnoreCase);
         }
 
         public string BattleTag { get; private set; }
@@ -53,7 +54,11 @@ namespace StatsFetcher
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(null));
         }
 
-        public HtmlDocument HotsLogsProfile { get; set; }
+        // Per-hero / per-map win rates (0..100), keyed by display name as returned by HeroesProfile.
+        // Populated once ProfileId is known; a miss on lookup (e.g. a localized hero/map name) is
+        // logged rather than throwing - see FileProcessor.ExtractFullData.
+        public Dictionary<string, float> HeroWinRates { get; private set; }
+        public Dictionary<string, float> MapWinRates { get; private set; }
 
         public class MmrValue
         {

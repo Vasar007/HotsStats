@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Diagnostics;
-using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using System.IO;
@@ -125,35 +124,35 @@ namespace StatsFetcher
 			}
 		}
 
-		// Extract data from HotsLogs profile while we don't know Heroes and Map
+		// Games-count is now populated directly from the HeroesProfile battletag/search response
+		// (see ProfileFetcher.FetchBasicProfile), so there's nothing left to extract here. Kept as
+		// a no-op so the existing FetchProfiles call site doesn't need touching.
 		public static void ExtractBasicData(Game game)
 		{
-			foreach (var p in game.Players) {
-				if (p.HotsLogsProfile == null)
-					continue;
-				try {
-					p.GamesCount = int.Parse(p.HotsLogsProfile.GetElementbyId("ctl00_MainContent_RadGridGeneralInformation").SelectSingleNode(".//td[text()='Total Games Played']/../td[2]").InnerText);
-				}
-				catch (Exception) { /* some dirty exception swallow */ }
-			}
 		}
 
-		// Extract data from HotsLogs profile when we know Heroes and Map
+		// Extract hero/map win rates from the dictionaries ProfileFetcher.FetchFullProfile filled in
+		// once we know which Hero/Map were actually played. A lookup miss (e.g. a localized game
+		// client reporting a hero/map name HeroesProfile doesn't recognize) is logged and left unset
+		// rather than crashing.
 		public static void ExtractFullData(Game game)
 		{
 			foreach (var p in game.Players) {
-				if (p.HotsLogsProfile == null)
-					continue;
-				// who wants to look at some dirty html parsing?
-				try {
-					p.MapWinRate = float.Parse(p.HotsLogsProfile.GetElementbyId("mapStatistics").SelectSingleNode($".//tr/td[text()='{game.Map}']").SelectSingleNode("./../td[last()]").InnerText.Replace("%", ""), CultureInfo.InvariantCulture);
+				float mapWinRate;
+				if (!string.IsNullOrEmpty(game.Map) && p.MapWinRates.TryGetValue(game.Map, out mapWinRate)) {
+					p.MapWinRate = mapWinRate;
 				}
-				catch { }
-				try {
-					p.HeroWinRate = float.Parse(p.HotsLogsProfile.GetElementbyId("heroStatistics").SelectSingleNode($".//tr/td/a[text()='{p.Hero}']").SelectSingleNode("./../../td[last()]").InnerText.Replace("%", ""), CultureInfo.InvariantCulture);
+				else {
+					_logger.Warn($"No HeroesProfile win rate for map '{game.Map}' ({p.BattleTag})");
 				}
-				catch { }
-				p.HotsLogsProfile = null; // release memory taken by large hotslogs page
+
+				float heroWinRate;
+				if (!string.IsNullOrEmpty(p.Hero) && p.HeroWinRates.TryGetValue(p.Hero, out heroWinRate)) {
+					p.HeroWinRate = heroWinRate;
+				}
+				else {
+					_logger.Warn($"No HeroesProfile win rate for hero '{p.Hero}' ({p.BattleTag})");
+				}
 			}
 		}
 	}

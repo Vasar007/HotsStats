@@ -178,11 +178,81 @@ namespace StatsFetcher
             return null;
         }
 
-        private Task FetchFullProfile(PlayerProfile p)
+        private static readonly string[] HeroNameKeys = { "hero", "hero_name", "name" };
+        private static readonly string[] MapNameKeys = { "map", "map_name", "name" };
+        private static readonly string[] WinRateKeys = { "win_rate", "winrate", "win_percent", "win_percentage" };
+
+        private async Task FetchFullProfile(PlayerProfile p)
         {
-            // Hero/map win-rate fetch (player/heroes/all + player/maps/all) is added separately;
-            // nothing to do here yet.
-            return Task.CompletedTask;
+            if (p.ProfileId == null)
+                return;
+
+            try {
+                var body = new { battletag = p.BattleTag, blizz_id = p.ProfileId, region = (int)game.Region };
+
+                var heroesTask = PostAsync("/api/v1/player/heroes/all", body);
+                var mapsTask = PostAsync("/api/v1/player/maps/all", body);
+                await Task.WhenAll(heroesTask, mapsTask).ConfigureAwait(false);
+
+                FillWinRates(heroesTask.Result, "/api/v1/player/heroes/all", p.HeroWinRates, HeroNameKeys, p);
+                FillWinRates(mapsTask.Result, "/api/v1/player/maps/all", p.MapWinRates, MapNameKeys, p);
+            }
+            catch (Exception ex) {
+                _logger.Warn(ex, $"Failed to fetch HeroesProfile hero/map win rates for {p.BattleTag}");
+                /* some dirty exception swallow - one bad player must not fail Task.WhenAll */
+            }
+        }
+
+        private void FillWinRates(string json, string endpoint, Dictionary<string, float> target, string[] nameKeys, PlayerProfile p)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+                return;
+
+            var items = ParseArray(json, endpoint);
+            if (items == null)
+                return;
+
+            foreach (var token in items) {
+                try {
+                    var obj = token as JObject;
+                    if (obj == null)
+                        continue;
+
+                    string name = null;
+                    foreach (var key in nameKeys) {
+                        var value = (string)obj[key];
+                        if (!string.IsNullOrEmpty(value)) {
+                            name = value;
+                            break;
+                        }
+                    }
+                    if (name == null) {
+                        _logger.Warn($"{endpoint} entry for {p.BattleTag} has no recognizable name field (tried {string.Join(", ", nameKeys)})");
+                        continue;
+                    }
+
+                    float? rate = null;
+                    foreach (var key in WinRateKeys) {
+                        var value = (float?)obj[key];
+                        if (value != null) {
+                            rate = value;
+                            break;
+                        }
+                    }
+                    if (rate == null) {
+                        _logger.Warn($"{endpoint} entry '{name}' for {p.BattleTag} has no recognizable win-rate field (tried {string.Join(", ", WinRateKeys)})");
+                        continue;
+                    }
+
+                    // HeroesProfile's win-rate scale hasn't been confirmed against a live response
+                    // (see the raw response logged above). Normalize a 0..1 fraction up to the 0..100
+                    // percentage scale FullStatsView.xaml's "{0}%" format expects.
+                    target[name] = rate.Value <= 1f ? rate.Value * 100f : rate.Value;
+                }
+                catch (Exception ex) {
+                    _logger.Warn(ex, $"Failed to read a {endpoint} entry for {p.BattleTag}");
+                }
+            }
         }
 
         private static async Task EnsureBootstrappedAsync()
