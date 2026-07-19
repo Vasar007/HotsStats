@@ -51,6 +51,9 @@ namespace StatsFetcher
             var client = new HttpClient(handler);
             client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36");
             client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+            // The overlay gates on this fetch completing, so a slow/tar-pitted response must not
+            // be allowed to hold it up for the 100s HttpClient default.
+            client.Timeout = TimeSpan.FromSeconds(10);
             return client;
         }
 
@@ -86,10 +89,26 @@ namespace StatsFetcher
 
                 JObject best = null;
                 long bestGames = -1;
+                JObject fullTagMatch = null;
                 foreach (var token in candidates) {
                     var candidate = token as JObject;
                     if (candidate == null)
                         continue;
+
+                    // Prefer an exact match on the full battletag (e.g. "Name#1234") when the
+                    // candidate exposes one - short name + region alone can collide with an
+                    // unrelated player who happens to share both, and the heuristic below would
+                    // then pick whichever of them has played the most games.
+                    if (fullTagMatch == null) {
+                        foreach (var key in FullBattleTagKeys) {
+                            var value = (string)candidate[key];
+                            if (!string.IsNullOrEmpty(value) && string.Equals(value, p.BattleTag, StringComparison.OrdinalIgnoreCase)) {
+                                fullTagMatch = candidate;
+                                break;
+                            }
+                        }
+                    }
+
                     var tagShort = (string)candidate["battletagShort"];
                     var region = (int?)candidate["region"];
                     if (!string.Equals(tagShort, p.Name, StringComparison.OrdinalIgnoreCase))
@@ -102,6 +121,11 @@ namespace StatsFetcher
                         bestGames = games;
                     }
                 }
+
+                // Only fall back to the short-name + most-games heuristic when no candidate
+                // exposed a usable full tag to match against.
+                if (fullTagMatch != null)
+                    best = fullTagMatch;
 
                 if (best == null) {
                     _logger.Info($"No HeroesProfile battletag/search match for {p.BattleTag} in region {game.Region}");
@@ -178,6 +202,9 @@ namespace StatsFetcher
             return null;
         }
 
+        // Field name unconfirmed against a live response (see the class-level comment) - probe a
+        // small key list defensively, same pattern as HeroNameKeys/MapNameKeys/WinRateKeys below.
+        private static readonly string[] FullBattleTagKeys = { "battletag", "battletag_full", "battle_tag" };
         private static readonly string[] HeroNameKeys = { "hero", "hero_name", "name" };
         private static readonly string[] MapNameKeys = { "map", "map_name", "name" };
         private static readonly string[] WinRateKeys = { "win_rate", "winrate", "win_percent", "win_percentage" };
@@ -212,6 +239,29 @@ namespace StatsFetcher
             if (items == null)
                 return;
 
+            // HeroesProfile's win-rate scale hasn't been confirmed against a live response (see
+            // the class-level comment). Decide the scale once for the whole response rather than
+            // per entry: scaling per entry turns a real small percentage (e.g. 0.5%) that happens
+            // to be <= 1 into 50% just because it looks like a 0..1 fraction. If any entry in the
+            // array is already > 1, the whole response is on the 0..100 scale; otherwise every
+            // entry is a 0..1 fraction and gets multiplied by 100 to match the 0..100 contract
+            // FullStatsView.xaml's "{0}%" format expects.
+            var alreadyPercent = false;
+            foreach (var token in items) {
+                var probe = token as JObject;
+                if (probe == null)
+                    continue;
+                foreach (var key in WinRateKeys) {
+                    var value = (float?)probe[key];
+                    if (value != null && value.Value > 1f) {
+                        alreadyPercent = true;
+                        break;
+                    }
+                }
+                if (alreadyPercent)
+                    break;
+            }
+
             foreach (var token in items) {
                 try {
                     var obj = token as JObject;
@@ -244,16 +294,20 @@ namespace StatsFetcher
                         continue;
                     }
 
-                    // HeroesProfile's win-rate scale hasn't been confirmed against a live response
-                    // (see the raw response logged above). Normalize a 0..1 fraction up to the 0..100
-                    // percentage scale FullStatsView.xaml's "{0}%" format expects.
-                    target[name] = rate.Value <= 1f ? rate.Value * 100f : rate.Value;
+                    target[name] = alreadyPercent ? rate.Value : rate.Value * 100f;
                 }
                 catch (Exception ex) {
                     _logger.Warn(ex, $"Failed to read a {endpoint} entry for {p.BattleTag}");
                 }
             }
         }
+
+        // Laravel's default session lifetime is ~120 minutes, so a session bootstrapped once at
+        // process start eventually expires; PostAsync re-bootstraps on a 419/401 below. This
+        // cooldown only guards the failure path (site unreachable / no XSRF cookie returned) so a
+        // persistently-down site isn't hammered with a bootstrap GET on every single API call.
+        private static readonly TimeSpan BootstrapCooldown = TimeSpan.FromSeconds(30);
+        private static DateTime _lastBootstrapAttempt = DateTime.MinValue;
 
         private static async Task EnsureBootstrappedAsync()
         {
@@ -265,17 +319,28 @@ namespace StatsFetcher
                 if (_bootstrapped)
                     return;
 
-                var response = await _web.GetAsync(BaseUrl + "/").ConfigureAwait(false);
-                _logger.Debug($"HeroesProfile session bootstrap responded {(int)response.StatusCode} {response.StatusCode}");
-            }
-            catch (Exception ex) {
-                _logger.Warn(ex, "Failed to bootstrap HeroesProfile session (fetching CSRF cookie)");
+                if (DateTime.UtcNow - _lastBootstrapAttempt < BootstrapCooldown)
+                    return;
+                _lastBootstrapAttempt = DateTime.UtcNow;
+
+                try {
+                    using (var response = await _web.GetAsync(BaseUrl + "/").ConfigureAwait(false)) {
+                        _logger.Debug($"HeroesProfile session bootstrap responded {(int)response.StatusCode} {response.StatusCode}");
+                    }
+                }
+                catch (Exception ex) {
+                    _logger.Warn(ex, "Failed to bootstrap HeroesProfile session (fetching CSRF cookie)");
+                    return;
+                }
+
+                // Only mark bootstrapped once we actually have a CSRF cookie - if it's still
+                // missing, every POST would 419 for the rest of the process. Leaving _bootstrapped
+                // false lets the next call retry (subject to the cooldown above).
+                _bootstrapped = GetXsrfToken() != null;
+                if (!_bootstrapped)
+                    _logger.Warn("HeroesProfile session bootstrap succeeded but no XSRF-TOKEN cookie was set");
             }
             finally {
-                // Even on failure, don't hammer heroesprofile.com with a bootstrap request before
-                // every single API call - a missing CSRF cookie will just make POSTs fail (and get
-                // logged) individually.
-                _bootstrapped = true;
                 _bootstrapGate.Release();
             }
         }
@@ -293,27 +358,60 @@ namespace StatsFetcher
             }
         }
 
-        private static async Task<string> PostAsync(string path, object body)
-        {
-            await EnsureBootstrappedAsync().ConfigureAwait(false);
+        // Laravel's CSRF-mismatch response; not a named HttpStatusCode member.
+        private const int CsrfExpiredStatusCode = 419;
 
-            var json = JsonConvert.SerializeObject(body);
+        private sealed class PostAttemptResult
+        {
+            public HttpStatusCode Status;
+            public string Body;
+        }
+
+        private static async Task<PostAttemptResult> SendPostOnceAsync(string path, string json)
+        {
             using (var request = new HttpRequestMessage(HttpMethod.Post, BaseUrl + path)) {
                 request.Content = new StringContent(json, Encoding.UTF8, "application/json");
                 var xsrf = GetXsrfToken();
                 if (!string.IsNullOrEmpty(xsrf))
                     request.Headers.Add("X-XSRF-TOKEN", xsrf);
 
-                var response = await _web.SendAsync(request).ConfigureAwait(false);
-                var str = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                LogFirstResponse(path, response.StatusCode, str);
-
-                if (!response.IsSuccessStatusCode) {
-                    _logger.Warn($"HeroesProfile {path} returned {(int)response.StatusCode} {response.StatusCode}");
-                    return null;
+                using (var response = await _web.SendAsync(request).ConfigureAwait(false)) {
+                    var str = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                    return new PostAttemptResult { Status = response.StatusCode, Body = str };
                 }
-                return str;
             }
+        }
+
+        private static async Task<string> PostAsync(string path, object body)
+        {
+            await EnsureBootstrappedAsync().ConfigureAwait(false);
+
+            var json = JsonConvert.SerializeObject(body);
+            var result = await SendPostOnceAsync(path, json).ConfigureAwait(false);
+
+            if ((int)result.Status == CsrfExpiredStatusCode || result.Status == HttpStatusCode.Unauthorized) {
+                // The session/CSRF cookie we sent was rejected - most likely it expired
+                // mid-process. Force a fresh bootstrap and retry exactly once rather than letting
+                // every subsequent POST fail silently for the rest of the process.
+                _logger.Info($"HeroesProfile {path} returned {(int)result.Status} {result.Status}; re-bootstrapping session and retrying once");
+                _bootstrapped = false;
+                await EnsureBootstrappedAsync().ConfigureAwait(false);
+                result = await SendPostOnceAsync(path, json).ConfigureAwait(false);
+            }
+
+            LogFirstResponse(path, result.Status, result.Body);
+
+            if (!IsSuccessStatusCode(result.Status)) {
+                _logger.Warn($"HeroesProfile {path} returned {(int)result.Status} {result.Status}");
+                return null;
+            }
+            return result.Body;
+        }
+
+        private static bool IsSuccessStatusCode(HttpStatusCode status)
+        {
+            var code = (int)status;
+            return code >= 200 && code < 300;
         }
 
         private static void LogFirstResponse(string path, HttpStatusCode status, string body)

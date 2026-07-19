@@ -61,7 +61,10 @@ namespace StatsDisplay
 
 		private void SetupHotkeys()
 		{
-			_hotKey = new HotKey(Key.Tab, KeyModifier.Shift | KeyModifier.NoRepeat);
+			_hotKey = new HotKey(Key.Tab, KeyModifier.Shift | KeyModifier.NoRepeat, register: false);
+			if (!_hotKey.Register()) {
+				_logger.Warn("Failed to register the Shift+Tab overlay hotkey; toggling the overlay via hotkey will not work.");
+			}
 			_hotKey.Pressed += (o, e) => {
 				if (_currentWindow == null) {
 					return;

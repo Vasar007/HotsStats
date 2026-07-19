@@ -19,6 +19,8 @@ namespace StatsDisplay.Stats
         private TeamVm _teamOne;
         private TeamVm _teamTwo;
         private PropertyChangedEventHandler _settingsPropertyChangedHandler;
+        private PropertyChangedEventHandler _gamePropertyChangedHandler;
+        private Game _subscribedGame;
 
         public int? TeamTwoAverageMmr
         {
@@ -98,10 +100,17 @@ namespace StatsDisplay.Stats
             TeamOneAverageMmr = TeamOne.AverageMmr(Settings.MmrDisplayMode);
             TeamTwoAverageMmr = TeamTwo.AverageMmr(Settings.MmrDisplayMode);
 
-            Game.PropertyChanged += (o, e) => {
+            // Capture the specific Game instance this VM is bound to rather than re-reading the
+            // Game property later: App.Game (and therefore what the Game property returns) is
+            // reassigned to a new Game on the next match before this window's Closed handler
+            // fires, so unsubscribing via the live Game property in OnDeactivated could detach
+            // from the wrong (new) instance and leave this subscription on the old one forever.
+            _subscribedGame = Game;
+            _gamePropertyChangedHandler = (o, e) => {
                 TeamOneAverageMmr = TeamOne.AverageMmr(Settings.MmrDisplayMode);
                 TeamTwoAverageMmr = TeamTwo.AverageMmr(Settings.MmrDisplayMode);
             };
+            _subscribedGame.PropertyChanged += _gamePropertyChangedHandler;
             // Settings.Default is an application-lifetime static, so this subscription must be
             // removed explicitly (see OnDeactivated) or every game would leak this view model
             // (and the window holding it) for the lifetime of the app.
@@ -120,12 +129,18 @@ namespace StatsDisplay.Stats
         }
 
         /// <summary>
-        /// Detaches from the static Settings.PropertyChanged event. Must be called when the
-        /// owning window is closed, otherwise this view model (and the window) is kept alive
-        /// for the rest of the application's lifetime.
+        /// Detaches from the static Settings.PropertyChanged event and the subscribed Game's
+        /// PropertyChanged event. Must be called when the owning window is closed, otherwise
+        /// this view model (and the window) is kept alive - by Settings.Default forever, and by
+        /// the Game instance until it is replaced by the next match.
         /// </summary>
         public void OnDeactivated()
         {
+            if (_gamePropertyChangedHandler != null && _subscribedGame != null) {
+                _subscribedGame.PropertyChanged -= _gamePropertyChangedHandler;
+                _gamePropertyChangedHandler = null;
+                _subscribedGame = null;
+            }
             if (_settingsPropertyChangedHandler != null) {
                 Settings.PropertyChanged -= _settingsPropertyChangedHandler;
                 _settingsPropertyChangedHandler = null;

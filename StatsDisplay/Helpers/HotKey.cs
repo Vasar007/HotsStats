@@ -4,12 +4,14 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Windows.Input;
 using System.Windows.Interop;
+using NLog;
 
 namespace StatsDisplay.Helpers
 {
     // Let's do some P/Invoke magic
     public class HotKey : IDisposable
     {
+        private static readonly Logger _logger = LogManager.GetCurrentClassLogger();
         private static Dictionary<int, HotKey> _dictHotKeyToCalBackProc;
 
         [DllImport("user32.dll")]
@@ -43,6 +45,9 @@ namespace StatsDisplay.Helpers
             bool result = RegisterHotKey(IntPtr.Zero, Id, (UInt32)KeyModifiers, (UInt32)virtualKeyCode);
 
             if (!result) {
+                // Debug.WriteLine is compiled out in Release, so a failed registration would
+                // otherwise go completely unlogged outside of a debug build - log it via NLog too.
+                _logger.Warn($"HotKey.Register: RegisterHotKey failed for key {Key} with modifiers {KeyModifiers} (id {Id}).");
                 Debug.WriteLine($"HotKey.Register: RegisterHotKey failed for key {Key} with modifiers {KeyModifiers} (id {Id}).");
             }
 
