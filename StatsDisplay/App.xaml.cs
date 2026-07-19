@@ -6,7 +6,6 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Threading;
 using NLog;
-using Squirrel;
 using StatsDisplay.Helpers;
 using StatsDisplay.Stats;
 using StatsFetcher;
@@ -29,7 +28,6 @@ namespace StatsDisplay
 		public static Properties.Settings Settings { get { return StatsDisplay.Properties.Settings.Default; } }
 
 		private static Logger _logger = LogManager.GetCurrentClassLogger();
-		private IUpdateManager _updateManager;
 		private static HotKey _hotKey;
 		private SynchronizationContext _currentSyncContext;
 		private Window _currentWindow;
@@ -59,7 +57,6 @@ namespace StatsDisplay
 		private void Application_Exit(object sender, ExitEventArgs e)
 		{
 			Settings.Save();
-			_updateManager?.Dispose();
 		}
 
 		private void SetupHotkeys()
@@ -155,19 +152,12 @@ namespace StatsDisplay
 			}
 		}
 
-		private async void CheckForUpdates()
+		private void CheckForUpdates()
 		{
-			if (Debug || !Settings.AutoUpdate)
-				return;
-
-			try {
-				if (_updateManager == null) {
-					_updateManager = await UpdateManager.GitHubUpdateManager(Settings.UpdateRepository);
-				}
-
-				var release = await _updateManager.UpdateApp();
-			}
-			catch { /* quietly eat some errors */ }
+			// Auto-update is disabled for this MVP: the default UpdateRepository used to point at
+			// the archived poma/HotsStats releases, and there's no vetted hotsapi release to
+			// auto-update onto yet either. Short-circuit before contacting Squirrel/GitHub at all.
+			_logger.Info("auto-update disabled for MVP");
 		}
 
 		/// <summary>

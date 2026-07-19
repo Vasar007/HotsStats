@@ -217,7 +217,7 @@ namespace StatsDisplay.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("https://github.com/poma/HotsStats")]
+        [global::System.Configuration.DefaultSettingValueAttribute("https://github.com/hotsapi/HotsStats")]
         public string UpdateRepository {
             get {
                 return ((string)(this["UpdateRepository"]));
