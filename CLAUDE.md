@@ -30,9 +30,9 @@ at the repo root.
 | `.appveyor.yml`                               | Legacy AppVeyor CI (VS2017 image, still references NuGet/Squirrel — not the current build; not used to build locally) |
 
 **The `Heroes.ReplayParser` submodule is required and is not committed as source.** `.gitmodules`
-points at `https://github.com/hotsapi/Heroes.ReplayParser.git`. You **must** initialize it before
-the solution will build (and see "Known Limitations / TODO" — the SDK-style retarget commit is
-not yet pushed there):
+points at `https://github.com/Vasar007/Heroes.ReplayParser.git` (a fork carrying the SDK-style
+`netstandard2.0` retarget on branch `local/net472`, since that retarget commit was never pushed
+upstream). You **must** initialize it before the solution will build:
 
 ```shell
 git submodule update --init --recursive
@@ -142,12 +142,6 @@ verification has happened.**
 
 ## Known Limitations / TODO
 
-- **Submodule retarget commit is local-only.** The `Heroes.ReplayParser` submodule's SDK-style /
-  `netstandard2.0` retarget lives only on the local `local/net472` branch of that submodule's
-  checkout (see `Heroes.ReplayParser/`); it has not been pushed to a fork on GitHub. A fresh clone
-  of this repo running `git submodule update --init --recursive` will **not** get that commit and
-  will fail to build until the commit is pushed somewhere reachable and `.gitmodules` (or the
-  submodule's tracked commit) points at it.
 - **BattleLobbyParser byte offsets are unverified.** They were made non-fatal (log-and-skip
   instead of throw) on layout drift, but have not been re-verified against a capture from the
   current game patch — region/battletag extraction may silently come back empty on a real lobby.
