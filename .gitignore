@@ -368,7 +368,6 @@ MigrationBackup/
 credentials.json
 # Persisted user credentials directory for Google.Apis.Auth.OAuth2.Responses.TokenResponse
 token.json/
-/ProjectV/MigrationBackup
 binary-tools
 Notes/
 
